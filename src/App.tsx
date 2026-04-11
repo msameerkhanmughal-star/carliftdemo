@@ -12,7 +12,7 @@ import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { Loader2, AlertTriangle, RefreshCw, Wifi } from "lucide-react";
+import { Loader as Loader2, TriangleAlert as AlertTriangle, RefreshCw, Wifi } from "lucide-react";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -107,34 +107,10 @@ const GuestOnlyRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppContent = () => {
   const [isReady, setIsReady] = useState(false);
-  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    try {
-      const timer = setTimeout(() => setIsReady(true), 100);
-      return () => clearTimeout(timer);
-    } catch (error) {
-      setHasError(true);
-    }
+    setIsReady(true);
   }, []);
-
-  if (hasError) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <div className="text-center max-w-md">
-          <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">Unable to Load</h2>
-          <p className="text-muted-foreground text-sm mb-6">Please check your internet connection and try again.</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-semibold hover:bg-primary/85 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" /> Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (!isReady) {
     return <InitializationError />;
