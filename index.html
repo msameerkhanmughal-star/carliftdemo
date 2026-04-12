@@ -33,5 +33,18 @@
       </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+
+      const isAdmin = location.pathname.startsWith('/carlift-admin');
+      const manifest = document.getElementById('pwa-manifest');
+      if (manifest && isAdmin) {
+        manifest.href = '/manifest-admin.json';
+      }
+    </script>
   </body>
 </html>

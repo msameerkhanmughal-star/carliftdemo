@@ -1,7 +1,7 @@
 {
-  "name": "Admin CarLift – Manage Operations",
-  "short_name": "Admin CarLift",
-  "description": "Car Lift Admin – Manage bookings, routes & notifications",
+  "name": "Car Lift Admin – Management Panel",
+  "short_name": "CL Admin",
+  "description": "Admin panel for managing Car Lift bookings and operations",
   "start_url": "/carlift-admin",
   "scope": "/carlift-admin",
   "display": "standalone",
@@ -28,5 +28,5 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["productivity", "business"]
+  "categories": ["business", "productivity"]
 }
