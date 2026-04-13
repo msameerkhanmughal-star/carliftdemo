@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import {
-  Crown, MapPin, CalendarCheck, Trash2, MessageCircle, FileText, Plus, ArrowLeft, X, Car, CheckCircle, Clock,
-  Bell, AlertTriangle, Shield, ChevronDown, ChevronUp, Users, TrendingUp, Timer, Settings,
-  ImageIcon, DollarSign, BarChart3, Loader2, Wifi, LogIn, Eye, EyeOff, Building2, Phone, Mail,
-  ChevronRight, CalendarClock, Share2, Hash, Pencil, UserRound, Menu
-} from "lucide-react";
+import { Crown, MapPin, CalendarCheck, Trash2, MessageCircle, FileText, Plus, ArrowLeft, X, Car, CircleCheck as CheckCircle, Clock, Bell, TriangleAlert as AlertTriangle, Shield, ChevronDown, ChevronUp, Users, TrendingUp, Timer, Settings, Image as ImageIcon, DollarSign, ChartBar as BarChart3, Loader as Loader2, Wifi, LogIn, Eye, EyeOff, Building2, Phone, Mail, ChevronRight, CalendarClock, Share2, Hash, Pencil, UserRound, Menu } from "lucide-react";
 import { jsPDF } from "jspdf";
 import {
   signInWithEmailAndPassword, createUserWithEmailAndPassword,
@@ -193,9 +188,31 @@ async function buildInvoicePDF(
 
   const logoBase64 = await loadLogoBase64();
 
-  // Raw URLs only — images are clickable links in the PDF, never embedded
-  const rawCarImg = b.assignedCar ? carImages[b.assignedCar] : '';
+  // Get car and driver images (convert URLs to base64 for embedding)
+  let carImgBase64 = '';
+  let driverImgBase64 = '';
+
+  if (b.assignedCar && carImages[b.assignedCar]) {
+    const rawImg = carImages[b.assignedCar];
+    if (rawImg.startsWith('http')) {
+      carImgBase64 = await loadImageBase64FromUrl(rawImg).catch(() => '');
+    } else {
+      carImgBase64 = rawImg;
+    }
+  }
+
   const assignedDriver = driversList?.find(d => d.id === b.assignedDriver);
+  if (assignedDriver && driverImages?.[assignedDriver.id]) {
+    const rawImg = driverImages[assignedDriver.id];
+    if (rawImg.startsWith('http')) {
+      driverImgBase64 = await loadImageBase64FromUrl(rawImg).catch(() => '');
+    } else {
+      driverImgBase64 = rawImg;
+    }
+  }
+
+  // Keep raw URLs for clickable links
+  const rawCarImg = b.assignedCar ? carImages[b.assignedCar] : '';
   const rawDriverImg = assignedDriver && driverImages ? driverImages[assignedDriver.id] : '';
 
   // Booking date formatted in PKT
@@ -360,9 +377,9 @@ async function buildInvoicePDF(
     ry += ROW_H;
   });
 
-  // ── Car image row (link only — no embedded image) ─────────────────────────
+  // ── Car image row (with embedded image) ─────────────────────────────────────
   if (b.assignedCar) {
-    const CAR_ROW_H = 18;
+    const CAR_ROW_H = 42;
     const rowBgCar = rows.length % 2 === 0 ? 22 : 14;
     doc.setFillColor(rowBgCar, rowBgCar, rowBgCar);
     doc.rect(14, ry, pageW - 28, CAR_ROW_H, 'F');
@@ -373,19 +390,40 @@ async function buildInvoicePDF(
     doc.setTextColor(155, 155, 155);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("ASSIGNED VEHICLE", 21, ry + 11.5);
+    doc.text("ASSIGNED VEHICLE", 21, ry + 5);
 
-    // Right: clickable link or "No photo"
-    if (rawCarImg?.startsWith('http')) {
-      doc.setTextColor(100, 170, 255);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.textWithLink("Click to view car photo", pageW - 20, ry + 11.5, { url: rawCarImg, align: "right" });
+    // Embedded car image (left side)
+    if (carImgBase64) {
+      try {
+        doc.addImage(carImgBase64, 'JPEG', 21, ry + 10, 20, 25);
+      } catch (e) {
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "italic");
+        doc.text("Photo unavailable", 21, ry + 22);
+      }
     } else {
       doc.setTextColor(100, 100, 100);
-      doc.setFontSize(8.5);
+      doc.setFontSize(7);
       doc.setFont("helvetica", "italic");
-      doc.text("No photo uploaded", pageW - 20, ry + 11.5, { align: "right" });
+      doc.text("No photo", 21, ry + 22);
+    }
+
+    // Right: car details
+    doc.setTextColor(235, 235, 235);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(b.assignedCar, pageW - 20, ry + 5, { align: "right" });
+
+    doc.setTextColor(155, 155, 155);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Class: ${b.class}`, pageW - 20, ry + 14, { align: "right" });
+    if (rawCarImg?.startsWith('http')) {
+      doc.setTextColor(100, 170, 255);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.textWithLink("[View Full]", pageW - 20, ry + 22, { url: rawCarImg, align: "right" });
     }
 
     doc.setDrawColor(40, 40, 40);
@@ -394,9 +432,9 @@ async function buildInvoicePDF(
     ry += CAR_ROW_H;
   }
 
-  // ── Driver Info row (link only — no embedded image) ───────────────────────
+  // ── Driver Info row (with embedded image) ──────────────────────────────────
   if (assignedDriver) {
-    const DRIVER_ROW_H = 36;
+    const DRIVER_ROW_H = 48;
     const driverRowBg = (rows.length + (b.assignedCar ? 1 : 0)) % 2 === 0 ? 22 : 14;
     doc.setFillColor(driverRowBg, driverRowBg, driverRowBg);
     doc.rect(14, ry, pageW - 28, DRIVER_ROW_H, 'F');
@@ -407,29 +445,50 @@ async function buildInvoicePDF(
     doc.setTextColor(155, 155, 155);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.text("ASSIGNED DRIVER", 21, ry + 9);
+    doc.text("ASSIGNED DRIVER", 21, ry + 5);
     doc.setTextColor(235, 235, 235);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text(assignedDriver.name, 21, ry + 20);
+    doc.text(assignedDriver.name, 21, ry + 14);
     if (assignedDriver.phone) {
       doc.setTextColor(160, 160, 160);
       doc.setFontSize(8.5);
       doc.setFont("helvetica", "normal");
-      doc.text(`Ph: ${assignedDriver.phone}`, 21, ry + 29);
+      doc.text(`Ph: ${assignedDriver.phone}`, 21, ry + 23);
     }
 
-    // Right: clickable driver photo link
-    if (rawDriverImg?.startsWith('http')) {
-      doc.setTextColor(100, 170, 255);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.textWithLink("Click to view driver photo", pageW - 20, ry + 20, { url: rawDriverImg, align: "right" });
+    // Embedded driver image (left side below text)
+    if (driverImgBase64) {
+      try {
+        doc.addImage(driverImgBase64, 'JPEG', 21, ry + 30, 16, 14);
+      } catch (e) {
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "italic");
+        doc.text("Photo unavailable", 21, ry + 37);
+      }
     } else {
       doc.setTextColor(100, 100, 100);
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setFont("helvetica", "italic");
-      doc.text("No photo uploaded", pageW - 20, ry + 20, { align: "right" });
+      doc.text("No photo", 21, ry + 37);
+    }
+
+    // Right: driver rating/license info
+    doc.setTextColor(155, 155, 155);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Driver Info", pageW - 20, ry + 5, { align: "right" });
+    doc.setTextColor(220, 220, 220);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("Verified & Licensed", pageW - 20, ry + 14, { align: "right" });
+
+    if (rawDriverImg?.startsWith('http')) {
+      doc.setTextColor(100, 170, 255);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.textWithLink("[View Full Profile]", pageW - 20, ry + 37, { url: rawDriverImg, align: "right" });
     }
 
     doc.setDrawColor(40, 40, 40);
@@ -438,8 +497,8 @@ async function buildInvoicePDF(
     ry += DRIVER_ROW_H;
   }
 
-  // ── Fare box (full-width) ─────────────────────────────────────────────────
-  ry += 8;
+  // ── Fare box (full-width with premium design) ────────────────────────────────
+  ry += 10;
 
   // Parse fare: "Rs 28,942 / month (22 working days + 11% SRB tax)"
   //  → mainFare = "Rs 28,942 / month"
@@ -449,59 +508,79 @@ async function buildInvoicePDF(
   const mainFare = parenIdx > 0 ? fareRaw.substring(0, parenIdx).trim() : fareRaw.trim();
   const fareDetail = parenIdx > 0 ? fareRaw.substring(parenIdx + 1).replace(/\)$/, '').trim() : '';
 
-  const FARE_BOX_H = fareDetail ? 40 : 32;
-  // Shadow layer
-  doc.setFillColor(100, 0, 0);
-  doc.roundedRect(16, ry + 2, pageW - 28, FARE_BOX_H, 3, 3, 'F');
-  // Main fare box
-  doc.setFillColor(160, 0, 0);
-  doc.roundedRect(14, ry, pageW - 28, FARE_BOX_H, 3, 3, 'F');
-  doc.setFillColor(200, 0, 0);
-  doc.roundedRect(14, ry, pageW - 28, 15, 3, 3, 'F');
-  doc.setFillColor(160, 0, 0);
-  doc.rect(14, ry + 12, pageW - 28, 3, 'F');
+  const FARE_BOX_H = fareDetail ? 48 : 40;
 
-  doc.setTextColor(255, 210, 210);
+  // Multi-layer shadow effect
+  doc.setFillColor(80, 0, 0);
+  doc.roundedRect(16, ry + 3, pageW - 28, FARE_BOX_H, 4, 4, 'F');
+  doc.setFillColor(120, 0, 0);
+  doc.roundedRect(15, ry + 1.5, pageW - 28, FARE_BOX_H, 4, 4, 'F');
+
+  // Main fare box with gradient effect
+  doc.setFillColor(200, 0, 0);
+  doc.roundedRect(14, ry, pageW - 28, FARE_BOX_H, 4, 4, 'F');
+
+  // Top highlight strip
+  doc.setFillColor(230, 40, 40);
+  doc.roundedRect(14, ry, pageW - 28, 8, 4, 0, 'F');
+
+  // Divider line
+  doc.setFillColor(160, 0, 0);
+  doc.rect(14, ry + 14, pageW - 28, 2, 'F');
+
+  // Header text
+  doc.setTextColor(255, 220, 220);
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.text("TOTAL MONTHLY FARE", 22, ry + 10);
+  doc.text("TOTAL MONTHLY FARE", 22, ry + 6);
   const statusLabel = b.status === 'approved' ? '[ CONFIRMED ]' : '[ PENDING APPROVAL ]';
   doc.setTextColor(255, 240, 210);
   doc.setFontSize(7.5);
-  doc.text(statusLabel, pageW - 20, ry + 10, { align: "right" });
+  doc.text(statusLabel, pageW - 20, ry + 6, { align: "right" });
 
   // Main amount — large white text
-  doc.setFontSize(18);
+  doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(255, 255, 255);
-  doc.text(mainFare, pageW / 2, ry + 25, { align: "center" });
+  doc.text(mainFare, pageW / 2, ry + 28, { align: "center" });
 
   // Breakdown line — smaller, light red
   if (fareDetail) {
-    doc.setFontSize(8);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(255, 190, 190);
-    doc.text(fareDetail, pageW / 2, ry + 33, { align: "center" });
+    doc.setTextColor(255, 200, 200);
+    doc.text(`(${fareDetail})`, pageW / 2, ry + 38, { align: "center" });
   }
 
   // ── Payment notice strip ──────────────────────────────────────────────────
-  ry += FARE_BOX_H + 8;
-  doc.setFillColor(10, 10, 10);
-  doc.roundedRect(14, ry, pageW - 28, 22, 2, 2, 'F');
-  doc.setDrawColor(50, 50, 50);
-  doc.setLineWidth(0.2);
-  doc.roundedRect(14, ry, pageW - 28, 22, 2, 2, 'S');
+  ry += FARE_BOX_H + 10;
+  doc.setFillColor(16, 16, 16);
+  doc.roundedRect(14, ry, pageW - 28, 26, 3, 3, 'F');
+  doc.setDrawColor(70, 70, 70);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(14, ry, pageW - 28, 26, 3, 3, 'S');
   doc.setFillColor(200, 0, 0);
-  doc.rect(14, ry, 4, 22, 'F');
+  doc.rect(14, ry, 4, 26, 'F');
 
-  doc.setTextColor(200, 80, 80);
-  doc.setFontSize(8.5);
+  doc.setTextColor(220, 100, 100);
+  doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
-  doc.text("Thank you for choosing " + (companyInfo.name || 'Car Lift') + "!", 23, ry + 9);
-  doc.setTextColor(110, 110, 110);
+  doc.text("Thank you for choosing " + (companyInfo.name || 'Car Lift') + "!", 23, ry + 8);
+
+  doc.setTextColor(130, 130, 130);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("Payment must be received before the start date via:", 23, ry + 14);
+
+  doc.setTextColor(155, 155, 155);
   doc.setFontSize(7.5);
-  doc.setFont("helvetica", "italic");
-  doc.text("System-generated invoice. Send payment via the selected method before start date.", 23, ry + 17);
+  doc.setFont("helvetica", "bold");
+  const paymentMethods = [
+    `${b.payment}`,
+    `Phone: ${companyInfo.phone}`,
+    `Email: ${companyInfo.email}`
+  ];
+  doc.text(paymentMethods.join("  |  "), 23, ry + 20);
 
   // ── Footer ────────────────────────────────────────────────────────────────
   const footerY = pageH - 30;
